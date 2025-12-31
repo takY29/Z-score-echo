@@ -1,0 +1,161 @@
+import streamlit as st
+import math
+
+# =============================
+# LANGUE
+# =============================
+
+lang = st.sidebar.selectbox("🌍 Language / Langue", ["Français 🇫🇷", "English 🇬🇧"])
+
+FR = lang == "Français 🇫🇷"
+
+# =============================
+# FONCTIONS
+# =============================
+
+def bsa_mosteller(weight, height):
+    return math.sqrt((weight * height) / 3600)
+
+def z_score(measured, mean, sd):
+    return (measured - mean) / sd
+
+# =============================
+# NORMES (approximations cliniques)
+# =============================
+
+def coronary_norms(bsa):
+    return {
+        "LMCA": {"mean": 2.4 * bsa**0.5, "sd": 0.3},
+        "LAD":  {"mean": 2.3 * bsa**0.5, "sd": 0.3},
+        "RCA":  {"mean": 2.2 * bsa**0.5, "sd": 0.3}
+    }
+
+def lv_mass_norms(bsa):
+    return 60 * bsa, 10
+
+def interpret_z(z):
+    if z < 2:
+        return "Normal" if FR else "Normal"
+    elif 2 <= z < 2.5:
+        return "Dilatation légère" if FR else "Mild dilatation"
+    elif 2.5 <= z < 5:
+        return "Anévrysme moyen" if FR else "Medium aneurysm"
+    else:
+        return "Anévrysme géant" if FR else "Giant aneurysm"
+
+# =============================
+# TITRE
+# =============================
+
+st.set_page_config(page_title="Z-score Echo Pédiatrique", layout="centered")
+
+st.title(
+    "🫀 Z-score Échocardiographie Cardiaque Pédiatrique"
+    if FR else
+    "🫀 Pediatric Echocardiography Z-score"
+)
+
+# =============================
+# DONNÉES PATIENT
+# =============================
+
+st.header("📊 Données anthropométriques" if FR else "📊 Anthropometric data")
+
+weight = st.number_input("Poids (kg)" if FR else "Weight (kg)", min_value=1.0, value=20.0)
+height = st.number_input("Taille (cm)" if FR else "Height (cm)", min_value=50.0, value=110.0)
+
+bsa = bsa_mosteller(weight, height)
+st.success(
+    f"Surface corporelle (BSA) : {bsa:.2f} m²"
+    if FR else
+    f"Body Surface Area (BSA): {bsa:.2f} m²"
+)
+
+# =============================
+# MESURES CORONAIRES
+# =============================
+
+st.header("🩺 Mesures coronaires" if FR else "🩺 Coronary measurements")
+
+lmca = st.number_input(
+    "Tronc coronaire gauche (TCG)" if FR else "Left main coronary artery (LMCA)", value=2.0
+)
+lad = st.number_input(
+    "Artère interventriculaire antérieure (IVA)" if FR else "Left anterior descending (LAD)", value=3.0
+)
+rca = st.number_input(
+    "Coronaire droite (CD)" if FR else "Right coronary artery (RCA)", value=2.0
+)
+
+# =============================
+# MASSE VG
+# =============================
+
+st.header("🫀 Ventricule gauche" if FR else "🫀 Left ventricle")
+
+lv_mass = st.number_input(
+    "Masse ventriculaire gauche (g)" if FR else "Left ventricular mass (g)", value=45.0
+)
+
+# =============================
+# CALCULS
+# =============================
+
+norms = coronary_norms(bsa)
+
+z_lmca = z_score(lmca, norms["LMCA"]["mean"], norms["LMCA"]["sd"])
+z_lad  = z_score(lad,  norms["LAD"]["mean"],  norms["LAD"]["sd"])
+z_rca  = z_score(rca,  norms["RCA"]["mean"],  norms["RCA"]["sd"])
+
+lvmi = lv_mass / bsa
+lv_mean, lv_sd = lv_mass_norms(bsa)
+z_lv = z_score(lv_mass, lv_mean, lv_sd)
+
+# =============================
+# RÉSULTATS
+# =============================
+
+st.header("📈 Résultats" if FR else "📈 Results")
+
+st.write(f"**TCG / LMCA Z-score** : {z_lmca:.2f} → {interpret_z(z_lmca)}")
+st.write(f"**IVA / LAD Z-score** : {z_lad:.2f} → {interpret_z(z_lad)}")
+st.write(f"**CD / RCA Z-score** : {z_rca:.2f} → {interpret_z(z_rca)}")
+
+st.divider()
+
+st.write(
+    f"**Masse VG indexée** : {lvmi:.1f} g/m²"
+    if FR else
+    f"**Indexed LV mass** : {lvmi:.1f} g/m²"
+)
+st.write(f"**Z-score masse VG** : {z_lv:.2f}")
+
+if z_lv < 2:
+    st.success(
+        "Pas d’hypertrophie ventriculaire gauche"
+        if FR else
+        "No left ventricular hypertrophy"
+    )
+else:
+    st.warning(
+        "Hypertrophie ventriculaire gauche"
+        if FR else
+        "Left ventricular hypertrophy"
+    )
+
+# =============================
+# CONCLUSION
+# =============================
+
+st.header("📝 Conclusion" if FR else "📝 Conclusion")
+
+st.markdown(f"""
+- **BSA** : {bsa:.2f} m²  
+- **TCG / LMCA Z** : {z_lmca:.2f}  
+- **IVA / LAD Z** : {z_lad:.2f}  
+- **CD / RCA Z** : {z_rca:.2f}  
+- **Masse VG indexée** : {lvmi:.1f} g/m² (Z = {z_lv:.2f})
+
+👉 **{"Dilatation coronaire retenue si Z ≥ 2" if FR else "Coronary dilatation if Z ≥ 2"}**  
+👉 **{"HVG retenue si Z > 2" if FR else "LVH if Z > 2"}**
+""")
